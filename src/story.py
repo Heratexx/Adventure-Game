@@ -1,51 +1,53 @@
-"""Module that handles displaying of adventure-games story"""
 import curses
 import textwrap
+from pathlib import Path
+
+import constants
+import globals
+from user_interface import UserInterface
 
 
-class StoryScreen:
-    """Story Screen Class, can display parts of the games' story"""
+class StoryScreen(UserInterface):
 
-    def __init__(self, screen):
-        """StoryScreen's init function"""
-        # hold current screen
-        self.screen = screen
+    def __init__(self):
+        super().__init__()
+        self.stories = dict()
+        for story in (Path(__file__).parent.parent
+                      / 'resources' / 'story').glob('*.story'):
+            with story.open() as file:
+                self.stories[story.stem] = file.read()
+        self.text = ''
+        self.story_content = None
+        self.setup()
 
-    # Print the Story-Screen to given screen.
+    def setup(self):
+        self.screen = curses.newwin(0, 0)
+        height, width = self.screen.getmaxyx()
+
+        self.story_content = curses.newwin(height - 2, width - 3, 2, 2)
+        self.screen.addstr(1, 4, 'Geschichte')
+        self.screen.addstr(1, width - 15, '[ENTER] Weiter')
+
+    def refresh(self):
+        self.screen.redrawwin()
+        self.story_content.redrawwin()
+        self.screen.refresh()
+        self.story_content.refresh()
+
     def print(self):
-        """Prints story-screen"""
-        screen_size = self.screen.getmaxyx()
-        story_win = curses.newwin(screen_size[0], screen_size[1], 0, 0)
-        story_win.addstr(1, 1, "Story Name")
+        if self.resized:
+            self.resized = False
+            self.setup()
+        width = self.story_content.getmaxyx()[1] - 4
+        self.story_content.clear()
+        self.story_content.addstr(1, 0, textwrap.fill(self.text, width))
+        self.refresh()
 
-        story_wrapper = curses.newwin(
-            int(screen_size[0] * 0.66), int(screen_size[1] - 5), 2, 3)
-        story_wrapper_screen_size = story_wrapper.getmaxyx()
-        story_wrapper.border()
-
-        text = "Lorem ipsum dolor sit amet, consetetur "
-        text += "sadipscing elitr, sed diam nonumy eirmod"
-        text += "tempor invidunt ut labore et"
-        text += "dolore magna aliquyam erat, sed diam voluptua. At vero eos"
-        text += "et accusam et justo duo dolores et"
-        text += "ea rebum. Stet clita kasd gubergren, no sea takimata"
-        text += "sanctus est Lorem ipsum dolor sit amet."
-        text += "Lorem ipsum dolor sit amet, consetetur sadipscing"
-        text += "elitr, sed diam nonumy eirmod tempor "
-        text += "invidunt ut labore et dolore magna aliquyam erat,"
-        text += "sed diam voluptua. At vero eos et "
-        text += "accusam et justo duo dolores et ea rebum. Stet clita"
-        text += "kasd gubergren, no sea takimata sanctus "
-        text += "est Lorem ipsum dolor sit amet. Lorem ipsum"
-        text += "dolor sit amet, consetetur sadipscing "
-        text += "elitr, sed diam nonumy eirmod tempor invidunt"
-        text += "ut labore et dolore magna aliquyam "
-        text += "erat, sed diam voluptua. "
-
-        story = curses.newwin(int(story_wrapper_screen_size[0] * 0.80),
-                              int(story_wrapper_screen_size[1] - 7), 3, 6)
-        story.addstr(1, 0, textwrap.fill(text, 750))
-
-        story_win.refresh()
-        story_wrapper.refresh()
-        story.refresh()
+    def handle(self, key: int, previous):
+        if key == constants.ENTER:
+            if self.text == self.stories['outro']:
+                self.text = ''
+                return globals.MAIN
+            self.text = ''
+            return globals.MAP
+        return self
